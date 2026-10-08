@@ -4,9 +4,9 @@ const config = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
   affiliateTag: process.env.MERCADO_LIVRE_AFFILIATE_TAG || '',
-  checkIntervalMinutes: parseInt(process.env.CHECK_INTERVAL_MINUTES, 10) || 30,
+  checkIntervalSeconds: parseInt(process.env.CHECK_INTERVAL_SECONDS, 10) || ((parseInt(process.env.CHECK_INTERVAL_MINUTES, 10) || 1) * 60),
   minDiscountPercent: parseInt(process.env.MIN_DISCOUNT_PERCENT, 10) || 15,
-  maxPostsPerRun: parseInt(process.env.MAX_POSTS_PER_RUN, 10) || 2,
+  maxPostsPerRun: parseInt(process.env.MAX_POSTS_PER_RUN, 10) || 5,
 };
 
 function validateConfig() {

@@ -106,7 +106,7 @@ bot.command('status', (ctx) => {
   const statusMsg =
 `⚙️ <b>Configurações Atuais:</b>\n
 📢 <b>Canal de Destino:</b> <code>${config.telegramChatId || 'NÃO CONFIGURADO'}</code>
-⏱️ <b>Intervalo:</b> A cada ${config.checkIntervalMinutes} minuto(s)
+⏱️ <b>Intervalo:</b> A cada ${config.checkIntervalSeconds} segundo(s)
 🏷️ <b>Desconto Mínimo:</b> ${config.minDiscountPercent}%
 📦 <b>Máximo por ciclo:</b> ${config.maxPostsPerRun} produto(s)
 🔗 <b>Tag Afiliado:</b> <code>${config.affiliateTag || 'Nenhuma (link direto)'}</code>`;
@@ -233,29 +233,29 @@ bot.on('channel_post', (ctx) => {
 
 async function bootstrap() {
   try {
-    await bot.launch();
     const me = await bot.telegram.getMe();
     console.log(`\n=================================================`);
     console.log(`🚀 Bot conectado com sucesso: @${me.username}`);
-    console.log(`📢 Canal configurado: ${config.telegramChatId || '(Nenhum ainda - defina no .env)'}`);
-    console.log(`⏱️ Intervalo de busca: A cada ${config.checkIntervalMinutes} minuto(s)`);
+    console.log(`📢 Destino configurado: ${config.telegramChatId || '(Nenhum)'}`);
+    console.log(`⏱️ Intervalo de busca: A cada ${config.checkIntervalSeconds} segundo(s)`);
+    console.log(`📦 Máximo por ciclo: ${config.maxPostsPerRun} ofertas`);
+    console.log(`🏷️ Desconto mínimo: ${config.minDiscountPercent}%`);
     console.log(`=================================================\n`);
 
-    // Agendamento cron para o robô de ofertas
-    // Exemplo: '*/30 * * * *' para a cada 30 minutos
-    const cronExpression = `*/${config.checkIntervalMinutes} * * * *`;
-    console.log(`[Cron] Agendador iniciado com expressão: "${cronExpression}"`);
-    
-    cron.schedule(cronExpression, () => {
-      runAutoDealsJob();
+    // Inicia escuta de mensagens do Telegram em segundo plano
+    bot.launch().catch((err) => {
+      console.error('[Bot] Erro na conexão do Telegram:', err.message);
     });
 
-    // Se o canal já estiver configurado, faz uma verificação inicial após 3 segundos
+    // Inicia loop de verificação de ofertas
+    setInterval(() => {
+      runAutoDealsJob();
+    }, config.checkIntervalSeconds * 1000);
+
+    // Executa a primeira checagem imediatamente ao ligar
     if (config.telegramChatId) {
-      setTimeout(() => {
-        console.log('[AutoDeals] Executando primeira checagem inicial de ofertas...');
-        runAutoDealsJob();
-      }, 3000);
+      console.log('[AutoDeals] Iniciando primeira varredura de ofertas...');
+      runAutoDealsJob();
     }
   } catch (err) {
     console.error('Erro fatal ao iniciar bot:', err.message);

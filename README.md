@@ -62,8 +62,8 @@ TELEGRAM_CHAT_ID=@sonecapromocao
 # Tag de afiliado do Mercado Livre (opcional)
 MERCADO_LIVRE_AFFILIATE_TAG=
 
-# Intervalo em minutos para checar novas ofertas (padrão: 30)
-CHECK_INTERVAL_MINUTES=30
+# Intervalo em segundos para checar novas ofertas (padrão: 30)
+CHECK_INTERVAL_SECONDS=30
 
 # Desconto mínimo (%) para uma oferta ser aceita (padrão: 15)
 MIN_DISCOUNT_PERCENT=15
