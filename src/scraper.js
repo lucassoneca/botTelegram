@@ -11,12 +11,12 @@ function attachAffiliateTag(url) {
   if (!config.affiliateTag) return url;
   
   const separator = url.includes('?') ? '&' : '?';
-  // Se a tag já possui chave=valor (ex: matt_tool=12345), anexa diretamente
+  // Se a tag já possui chave=valor (ex: matt_tool=12345 ou tracking_id=xxx), anexa diretamente
   if (config.affiliateTag.includes('=')) {
     return `${url}${separator}${config.affiliateTag}`;
   }
-  // Caso contrário, anexa como parâmetro genérico de afiliado
-  return `${url}${separator}afiliado=${encodeURIComponent(config.affiliateTag)}`;
+  // Para códigos do programa de Criadores/Afiliados (ex: BELU20240426143437)
+  return `${url}${separator}tracking_id=${encodeURIComponent(config.affiliateTag)}`;
 }
 
 /**

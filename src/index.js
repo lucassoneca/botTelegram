@@ -20,17 +20,22 @@ async function sendDeal(chatId, deal) {
 
   try {
     if (deal.image) {
-      await bot.telegram.sendPhoto(chatId, deal.image, {
-        caption: formatted.caption,
-        parse_mode: 'HTML',
-        ...keyboard,
-      });
-    } else {
-      await bot.telegram.sendMessage(chatId, formatted.caption, {
-        parse_mode: 'HTML',
-        ...keyboard,
-      });
+      try {
+        await bot.telegram.sendPhoto(chatId, deal.image, {
+          caption: formatted.caption,
+          parse_mode: 'HTML',
+          ...keyboard,
+        });
+        return true;
+      } catch (photoErr) {
+        console.warn(`[Telegram] Falha ao enviar foto (${photoErr.message}), tentando enviar apenas texto...`);
+      }
     }
+
+    await bot.telegram.sendMessage(chatId, formatted.caption, {
+      parse_mode: 'HTML',
+      ...keyboard,
+    });
     return true;
   } catch (error) {
     console.error(`[Telegram] Erro ao enviar mensagem para ${chatId}:`, error.message);
@@ -245,12 +250,12 @@ async function bootstrap() {
       runAutoDealsJob();
     });
 
-    // Se o canal já estiver configurado, faz uma verificação inicial após 15 segundos
+    // Se o canal já estiver configurado, faz uma verificação inicial após 3 segundos
     if (config.telegramChatId) {
       setTimeout(() => {
         console.log('[AutoDeals] Executando primeira checagem inicial de ofertas...');
         runAutoDealsJob();
-      }, 15000);
+      }, 3000);
     }
   } catch (err) {
     console.error('Erro fatal ao iniciar bot:', err.message);

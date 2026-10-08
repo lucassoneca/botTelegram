@@ -12,7 +12,7 @@ const config = {
 function validateConfig() {
   const missing = [];
   if (!config.telegramBotToken) missing.push('TELEGRAM_BOT_TOKEN');
-  
+
   if (missing.length > 0) {
     throw new Error(`Configurações obrigatórias ausentes no .env: ${missing.join(', ')}`);
   }
