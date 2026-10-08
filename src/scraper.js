@@ -29,85 +29,101 @@ function extractProductId(url) {
 }
 
 /**
- * Busca ofertas em destaque na página de promoções do Mercado Livre
+ * Busca ofertas em destaque na página de promoções do Mercado Livre (suporta múltiplas páginas)
  */
-async function fetchDeals(minDiscount = 15) {
-  try {
-    const response = await axios.get('https://www.mercadolivre.com.br/ofertas', {
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      timeout: 15000,
-    });
+async function fetchDeals(minDiscount = 15, maxPages = config.maxPagesToScrape || 5) {
+  const deals = [];
+  const seenIds = new Set();
 
-    const $ = cheerio.load(response.data);
-    const deals = [];
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      const pageUrl = page === 1 
+        ? 'https://www.mercadolivre.com.br/ofertas' 
+        : `https://www.mercadolivre.com.br/ofertas?page=${page}`;
 
-    $('.poly-card, .promotion-item').each((_, element) => {
-      const card = $(element);
-      
-      const rawTitle = card.find('.poly-component__title, .promotion-item__title, a[title]').text().trim() ||
-                       card.find('a').attr('title') || '';
-      
-      let link = card.find('a').attr('href') || '';
-      if (!link || !link.startsWith('http') || link.includes('click1.mercadolivre')) {
-        return; // Pula anúncios patrocinados e links sem destino
-      }
-
-      // Limpa parâmetros de rastreamento nativos da página
-      if (link.includes('?')) {
-        link = link.split('?')[0];
-      }
-
-      const id = extractProductId(link);
-      const currentPriceStr = card.find('.poly-price__current .andes-money-amount__fraction, .promotion-item__price span').first().text().trim();
-      const currentPriceCents = card.find('.poly-price__current .andes-money-amount__cents').first().text().trim();
-      const originalPriceStr = card.find('.andes-money-amount--previous .andes-money-amount__fraction, .promotion-item__old-price').first().text().trim();
-      const discountText = card.find('.andes-money-amount__discount, .promotion-item__discount').text().trim();
-
-      // Cálculo ou extração do percentual de desconto
-      let discountPercent = 0;
-      const discountMatch = discountText.match(/(\d+)%/);
-      if (discountMatch) {
-        discountPercent = parseInt(discountMatch[1], 10);
-      } else if (originalPriceStr && currentPriceStr) {
-        const orig = parseFloat(originalPriceStr.replace(/\./g, '').replace(',', '.'));
-        const curr = parseFloat(currentPriceStr.replace(/\./g, '').replace(',', '.'));
-        if (orig > curr) {
-          discountPercent = Math.round(((orig - curr) / orig) * 100);
-        }
-      }
-
-      // Filtra pelo desconto mínimo configurado
-      if (discountPercent < minDiscount) {
-        return;
-      }
-
-      const image = card.find('img').attr('data-src') || card.find('img').attr('src') || '';
-      const installments = card.find('.poly-price__installments, .promotion-item__installments').text().trim();
-
-      const finalPrice = currentPriceCents ? `${currentPriceStr},${currentPriceCents}` : currentPriceStr;
-
-      deals.push({
-        id,
-        title: rawTitle,
-        link: attachAffiliateTag(link),
-        originalUrl: link,
-        currentPrice: finalPrice,
-        originalPrice: originalPriceStr || null,
-        discountPercent,
-        installments: installments || null,
-        image,
+      const response = await axios.get(pageUrl, {
+        headers: {
+          'User-Agent': USER_AGENT,
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        timeout: 15000,
       });
-    });
 
-    return deals;
-  } catch (error) {
-    console.error('[Scraper] Erro ao buscar ofertas:', error.message);
-    return [];
+      const $ = cheerio.load(response.data);
+      let pageDealsCount = 0;
+
+      $('.poly-card, .promotion-item').each((_, element) => {
+        const card = $(element);
+        
+        const rawTitle = card.find('.poly-component__title, .promotion-item__title, a[title]').text().trim() ||
+                         card.find('a').attr('title') || '';
+        
+        let link = card.find('a').attr('href') || '';
+        if (!link || !link.startsWith('http') || link.includes('click1.mercadolivre')) {
+          return; // Pula anúncios patrocinados e links sem destino
+        }
+
+        // Limpa parâmetros de rastreamento nativos da página
+        if (link.includes('?')) {
+          link = link.split('?')[0];
+        }
+
+        const id = extractProductId(link);
+        if (seenIds.has(id)) return;
+        seenIds.add(id);
+
+        const currentPriceStr = card.find('.poly-price__current .andes-money-amount__fraction, .promotion-item__price span').first().text().trim();
+        const currentPriceCents = card.find('.poly-price__current .andes-money-amount__cents').first().text().trim();
+        const originalPriceStr = card.find('.andes-money-amount--previous .andes-money-amount__fraction, .promotion-item__old-price').first().text().trim();
+        const discountText = card.find('.andes-money-amount__discount, .promotion-item__discount').text().trim();
+
+        // Cálculo ou extração do percentual de desconto
+        let discountPercent = 0;
+        const discountMatch = discountText.match(/(\d+)%/);
+        if (discountMatch) {
+          discountPercent = parseInt(discountMatch[1], 10);
+        } else if (originalPriceStr && currentPriceStr) {
+          const orig = parseFloat(originalPriceStr.replace(/\./g, '').replace(',', '.'));
+          const curr = parseFloat(currentPriceStr.replace(/\./g, '').replace(',', '.'));
+          if (orig > curr) {
+            discountPercent = Math.round(((orig - curr) / orig) * 100);
+          }
+        }
+
+        // Filtra pelo desconto mínimo configurado
+        if (discountPercent < minDiscount) {
+          return;
+        }
+
+        const image = card.find('img').attr('data-src') || card.find('img').attr('src') || '';
+        const installments = card.find('.poly-price__installments, .promotion-item__installments').text().trim();
+
+        const finalPrice = currentPriceCents ? `${currentPriceStr},${currentPriceCents}` : currentPriceStr;
+
+        deals.push({
+          id,
+          title: rawTitle,
+          link: attachAffiliateTag(link),
+          originalUrl: link,
+          currentPrice: finalPrice,
+          originalPrice: originalPriceStr || null,
+          discountPercent,
+          installments: installments || null,
+          image,
+        });
+        pageDealsCount++;
+      });
+
+      if (pageDealsCount === 0 && page > 1) {
+        break;
+      }
+    } catch (pageError) {
+      console.warn(`[Scraper] Aviso: Erro ao ler página ${page} de ofertas (${pageError.message})`);
+    }
   }
+
+  return deals;
 }
 
 /**

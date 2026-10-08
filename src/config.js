@@ -7,6 +7,7 @@ const config = {
   checkIntervalSeconds: parseInt(process.env.CHECK_INTERVAL_SECONDS, 10) || ((parseInt(process.env.CHECK_INTERVAL_MINUTES, 10) || 1) * 60),
   minDiscountPercent: parseInt(process.env.MIN_DISCOUNT_PERCENT, 10) || 15,
   maxPostsPerRun: parseInt(process.env.MAX_POSTS_PER_RUN, 10) || 5,
+  maxPagesToScrape: parseInt(process.env.MAX_PAGES_TO_SCRAPE, 10) || 5,
 };
 
 function validateConfig() {
