@@ -1,0 +1,26 @@
+{
+  "name": "bot-ofertas-mercadolivre-telegram",
+  "version": "1.0.0",
+  "description": "Bot do Telegram para monitorar e postar promoções do Mercado Livre com links de afiliado",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "telegram-bot",
+    "mercado-livre",
+    "afiliados",
+    "promocoes",
+    "ofertas"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3",
+    "telegraf": "^4.16.3"
+  }
+}
