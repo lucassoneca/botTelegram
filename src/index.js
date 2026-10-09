@@ -43,73 +43,51 @@ async function sendDeal(chatId, deal) {
   }
 }
 
-// Fila de ofertas aguardando postagem
-const dealsQueue = [];
-let isScraping = false;
+let isRunningJob = false;
 
 /**
- * Varre as páginas do Mercado Livre e adiciona novos produtos à fila
+ * Rotina automática: varre ofertas filtradas e publica no canal
  */
-async function replenishQueue() {
-  if (isScraping) return;
-  isScraping = true;
+async function runAutoDealsJob() {
+  if (!config.telegramChatId) {
+    console.log('[AutoDeals] Aviso: TELEGRAM_CHAT_ID não está configurado.');
+    return;
+  }
+
+  if (isRunningJob) return;
+  isRunningJob = true;
 
   try {
-    console.log(`[Fila] [${new Date().toLocaleTimeString()}] Buscando ofertas no Mercado Livre (${config.maxPagesToScrape} páginas)...`);
+    console.log(`[AutoDeals] [${new Date().toLocaleTimeString()}] Buscando ofertas (Hardware, Roupas, Calçados e Suplementos)...`);
     const deals = await fetchDeals(config.minDiscountPercent, config.maxPagesToScrape);
 
-    let addedCount = 0;
-    for (const deal of deals) {
-      const alreadyInQueue = dealsQueue.some(item => item.id === deal.id);
-      if (!alreadyInQueue && !isPosted(deal.id)) {
-        dealsQueue.push(deal);
-        addedCount++;
+    const newDeals = deals.filter(deal => !isPosted(deal.id));
+    console.log(`[AutoDeals] ${deals.length} oferta(s) encontrada(s) nas categorias | ${newDeals.length} nova(s) para postar.`);
+
+    let postedCount = 0;
+    for (const deal of newDeals) {
+      if (postedCount >= config.maxPostsPerRun) break;
+
+      console.log(`[AutoDeals] Postando: "${deal.title}" (-${deal.discountPercent}%) [${deal.category || 'Promo'}]`);
+      const success = await sendDeal(config.telegramChatId, deal);
+
+      if (success) {
+        markAsPosted(deal.id, deal.title);
+        postedCount++;
+        // Pausa de 2.5s entre posts para evitar limites do Telegram
+        await new Promise(resolve => setTimeout(resolve, 2500));
       }
     }
 
-    if (addedCount > 0) {
-      console.log(`[Fila] +${addedCount} nova(s) oferta(s) adicionada(s) à fila! Total na fila aguardando: ${dealsQueue.length}`);
+    if (postedCount > 0) {
+      console.log(`[AutoDeals] ✅ ${postedCount} oferta(s) postada(s) com sucesso neste ciclo.`);
     } else {
-      console.log(`[Fila] Nenhuma oferta nova descoberta. Ofertas aguardando na fila: ${dealsQueue.length}`);
+      console.log(`[AutoDeals] Nenhuma oferta nova para postar neste ciclo.`);
     }
   } catch (err) {
-    console.error('[Fila] Erro ao buscar ofertas para a fila:', err.message);
+    console.error('[AutoDeals] Erro ao processar ofertas:', err.message);
   } finally {
-    isScraping = false;
-  }
-}
-
-/**
- * Retira 1 oferta da fila e publica no canal (1 por minuto)
- */
-async function dispatchNextDeal() {
-  if (!config.telegramChatId) {
-    console.log('[Fila] Aviso: TELEGRAM_CHAT_ID não configurado.');
-    return;
-  }
-
-  // Se a fila estiver vazia ou quase vazia, agenda nova varredura
-  if (dealsQueue.length <= 3 && !isScraping) {
-    replenishQueue();
-  }
-
-  if (dealsQueue.length === 0) {
-    console.log(`[Fila] [${new Date().toLocaleTimeString()}] Fila vazia no momento. Aguardando novas ofertas...`);
-    return;
-  }
-
-  // Pega a próxima oferta da fila
-  const deal = dealsQueue.shift();
-  console.log(`[Fila] [${new Date().toLocaleTimeString()}] Postando 1 oferta: "${deal.title}" (Desconto: ${deal.discountPercent}%)`);
-
-  const success = await sendDeal(config.telegramChatId, deal);
-  if (success) {
-    markAsPosted(deal.id, deal.title);
-    console.log(`[Fila] ✅ Oferta postada com sucesso! Restam ${dealsQueue.length} ofertas aguardando na fila.`);
-  } else {
-    // Se falhar, recoloca no início da fila para tentar no próximo minuto
-    dealsQueue.unshift(deal);
-    console.warn(`[Fila] ⚠️ Falha ao postar. Oferta mantida na fila para a próxima tentativa.`);
+    isRunningJob = false;
   }
 }
 
@@ -121,8 +99,8 @@ async function dispatchNextDeal() {
 bot.start((ctx) => {
   const welcome = 
 `👋 <b>Olá! Eu sou o Bot de Ofertas do Mercado Livre.</b>\n
+🎯 <b>Categorias ativas:</b> Hardware, Roupas, Calçados e Suplementos\n
 📌 <b>Comandos disponíveis:</b>
-/fila - Ver quantidade de ofertas na fila de espera
 /status - Ver status da configuração do bot
 /id - Descobrir o ID deste chat ou canal
 /testar - Buscar e pré-visualizar uma oferta agora
@@ -132,32 +110,14 @@ bot.start((ctx) => {
   ctx.reply(welcome, { parse_mode: 'HTML' });
 });
 
-// Comando /fila
-bot.command('fila', (ctx) => {
-  const count = dealsQueue.length;
-  let msg = `📦 <b>Fila de Ofertas:</b>\n\n`;
-  msg += `Total aguardando postagem: <b>${count} produto(s)</b>\n`;
-  msg += `⏱️ Ritmo de envio: <b>1 oferta a cada ${config.postIntervalSeconds} segundo(s)</b>\n\n`;
-
-  if (count > 0) {
-    msg += `<b>Próximos da fila:</b>\n`;
-    dealsQueue.slice(0, 3).forEach((d, i) => {
-      msg += `${i + 1}. ${d.title.substring(0, 40)}... (-${d.discountPercent}%)\n`;
-    });
-  } else {
-    msg += `<i>A fila está vazia no momento. Em breve uma nova busca será realizada!</i>`;
-  }
-
-  ctx.reply(msg, { parse_mode: 'HTML' });
-});
-
 // Comando /status
 bot.command('status', (ctx) => {
   const statusMsg =
 `⚙️ <b>Configurações Atuais:</b>\n
 📢 <b>Canal de Destino:</b> <code>${config.telegramChatId || 'NÃO CONFIGURADO'}</code>
-⏱️ <b>Ritmo de Envio:</b> 1 oferta a cada ${config.postIntervalSeconds} segundo(s)
-📦 <b>Fila Atual:</b> ${dealsQueue.length} oferta(s) aguardando
+🎯 <b>Categorias:</b> 💻 Hardware | 👕 Roupas | 👟 Calçados | 💊 Suplementos
+⏱️ <b>Intervalo:</b> A cada ${config.checkIntervalSeconds} segundo(s)
+📦 <b>Máximo por ciclo:</b> ${config.maxPostsPerRun} oferta(s)
 📄 <b>Páginas por Busca:</b> ${config.maxPagesToScrape} páginas
 🏷️ <b>Desconto Mínimo:</b> ${config.minDiscountPercent}%
 🔗 <b>Tag Afiliado:</b> <code>${config.affiliateTag || 'Nenhuma (link direto)'}</code>`;
@@ -288,7 +248,9 @@ async function bootstrap() {
     console.log(`\n=================================================`);
     console.log(`🚀 Bot conectado com sucesso: @${me.username}`);
     console.log(`📢 Destino configurado: ${config.telegramChatId || '(Nenhum)'}`);
-    console.log(`⏱️ Ritmo de envio: 1 oferta a cada ${config.postIntervalSeconds} segundo(s) (1 por minuto)`);
+    console.log(`🎯 Categorias: Hardware, Roupas, Calçados e Suplementos`);
+    console.log(`⏱️ Intervalo de busca: A cada ${config.checkIntervalSeconds} segundo(s)`);
+    console.log(`📦 Máximo por ciclo: ${config.maxPostsPerRun} oferta(s)`);
     console.log(`📄 Páginas monitoradas: ${config.maxPagesToScrape} páginas`);
     console.log(`🏷️ Desconto mínimo: ${config.minDiscountPercent}%`);
     console.log(`=================================================\n`);
@@ -298,24 +260,15 @@ async function bootstrap() {
       console.error('[Bot] Erro na conexão do Telegram:', err.message);
     });
 
-    // 1. Carrega as ofertas na fila imediatamente
-    await replenishQueue();
+    // Loop de verificação periódica
+    setInterval(() => {
+      runAutoDealsJob();
+    }, config.checkIntervalSeconds * 1000);
 
-    // 2. Dispara a primeira oferta imediatamente se houver na fila
-    if (dealsQueue.length > 0) {
-      dispatchNextDeal();
+    // Primeira execução imediata
+    if (config.telegramChatId) {
+      runAutoDealsJob();
     }
-
-    // 3. Worker de envio contínuo: 1 por minuto (ou conforme POST_INTERVAL_SECONDS)
-    setInterval(() => {
-      dispatchNextDeal();
-    }, config.postIntervalSeconds * 1000);
-
-    // 4. Worker de abastecimento periódico para trazer novas ofertas
-    setInterval(() => {
-      replenishQueue();
-    }, config.scrapeIntervalMinutes * 60 * 1000);
-
   } catch (err) {
     console.error('Erro fatal ao iniciar bot:', err.message);
   }

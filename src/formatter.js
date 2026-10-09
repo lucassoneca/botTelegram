@@ -22,6 +22,17 @@ function formatDealMessage(deal) {
   let message = `🔥 <b>OFERTA IMPERDÍVEL NO MERCADO LIVRE!</b>\n\n`;
   message += `📦 <b>${title}</b>\n\n`;
 
+  const categoryBadges = {
+    hardware: '💻 Hardware & Periféricos',
+    roupas: '👕 Moda & Roupas',
+    calcados: '👟 Calçados & Tênis',
+    suplementos: '💊 Suplementos & Saúde',
+  };
+
+  if (deal.category && categoryBadges[deal.category]) {
+    message += `🏷️ <b>Categoria:</b> ${categoryBadges[deal.category]}\n`;
+  }
+
   if (originalPrice && deal.discountPercent > 0) {
     message += `❌ <s>De: ${originalPrice}</s>\n`;
   }

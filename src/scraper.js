@@ -28,6 +28,55 @@ function extractProductId(url) {
   return url.split('?')[0];
 }
 
+// Categorias permitidas: Hardware, Roupas, Calçados e Suplementos
+const ALLOWED_CATEGORIES = {
+  hardware: [
+    'placa de video', 'placa de vídeo', 'gpu', 'processador', 'ryzen', 'intel core',
+    'ssd', 'nvme', 'memoria ram', 'memória ram', 'placa mae', 'placa mãe', 'placa-mãe',
+    'fonte atx', 'gabinete gamer', 'teclado mecanico', 'teclado mecânico', 'mouse gamer',
+    'headset gamer', 'headset', 'notebook', 'pc gamer', 'computador', 'monitor gamer',
+    'monitor', 'rtx', 'gtx', 'radeon', 'rx 6', 'rx 7', 'water cooler', 'air cooler',
+    'cooler fan', 'switch gigabit', 'roteador', 'webcam', 'geforce', 'memória ddr',
+    'memoria ddr', 'hub usb', 'placa de som'
+  ],
+  roupas: [
+    'camiseta', 'camisa', 'calça', 'calca', 'bermuda', 'jaqueta', 'moletom', 'cueca',
+    'boxer', 'meia', 'meias', 'shorts', 'vestido', 'saia', 'casaco', 'regata', 'blusa',
+    'gola polo', 'polo', 'agasalho', 'calção', 'calcao', 'dry fit', 'dry-fit', 'jeans',
+    'sutiã', 'lingerie', 'top fitness', 'legging', 'biquíni', 'maiô'
+  ],
+  calcados: [
+    'tênis', 'tenis', 'sapato', 'bota', 'coturno', 'sandália', 'sandalia', 'chinelo',
+    'chuteira', 'sapatilha', 'mocassim', 'sneaker', 'papete', 'crocs', 'botina', 'chinela'
+  ],
+  suplementos: [
+    'creatina', 'whey', 'proteína', 'proteina', 'bcaa', 'hipercalórico', 'hipercalorico',
+    'pré-treino', 'pre-treino', 'pre treino', 'glutamina', 'multivitamínico', 'multivitaminico',
+    'ômega 3', 'omega 3', 'cafeína', 'cafeina', 'colágeno', 'colageno', 'albumina',
+    'termogênico', 'termogenico', 'feno grego', 'tribulus', 'coenzima q10', 'vitamina',
+    'dark lab', 'growth supplements', 'max titanium', 'soldiers nutrition', 'integralmedica',
+    'nutricandies', 'pasta de amendoim', 'whey protein', 'isolado', 'concentrado'
+  ]
+};
+
+/**
+ * Verifica se o título do produto pertence a uma das categorias permitidas
+ */
+function matchesAllowedCategory(title) {
+  if (!title) return { match: false, category: null };
+  const lower = title.toLowerCase();
+
+  for (const [category, keywords] of Object.entries(ALLOWED_CATEGORIES)) {
+    for (const kw of keywords) {
+      if (lower.includes(kw)) {
+        return { match: true, category };
+      }
+    }
+  }
+
+  return { match: false, category: null };
+}
+
 /**
  * Busca ofertas em destaque na página de promoções do Mercado Livre (suporta múltiplas páginas)
  */
@@ -59,6 +108,12 @@ async function fetchDeals(minDiscount = 15, maxPages = config.maxPagesToScrape |
         const rawTitle = card.find('.poly-component__title, .promotion-item__title, a[title]').text().trim() ||
                          card.find('a').attr('title') || '';
         
+        // Filtro estrito: apenas Hardware, Roupas, Calçados e Suplementos
+        const categoryCheck = matchesAllowedCategory(rawTitle);
+        if (!categoryCheck.match) {
+          return; // Pula itens fora das categorias solicitadas
+        }
+
         let link = card.find('a').attr('href') || '';
         if (!link || !link.startsWith('http') || link.includes('click1.mercadolivre')) {
           return; // Pula anúncios patrocinados e links sem destino
@@ -104,6 +159,7 @@ async function fetchDeals(minDiscount = 15, maxPages = config.maxPagesToScrape |
         deals.push({
           id,
           title: rawTitle,
+          category: categoryCheck.category,
           link: attachAffiliateTag(link),
           originalUrl: link,
           currentPrice: finalPrice,
@@ -188,4 +244,6 @@ module.exports = {
   fetchDeals,
   fetchProductDetails,
   attachAffiliateTag,
+  matchesAllowedCategory,
+  ALLOWED_CATEGORIES,
 };
