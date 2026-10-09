@@ -51,7 +51,7 @@ Estes comandos podem ser enviados diretamente no bate-papo privado com o seu bot
 * **Como usar para Grupos e Canais:**
   1. Adicione o bot como administrador no seu grupo ou canal.
   2. Envie `/id` (ou qualquer mensagem no canal).
-  3. O bot exibirá o ID numérico (ex: `-1001234567890`).
+  3. O bot exibirá o ID numérico.
   4. Insira esse valor na variável `TELEGRAM_CHAT_ID` do seu `.env`.
 
 #### 4. `/testar`
@@ -142,7 +142,7 @@ TELEGRAM_CHAT_ID=@seu_canal_de_ofertas
 # Parâmetros de rastreamento de afiliado do Mercado Livre
 MERCADO_LIVRE_AFFILIATE_TAG=matt_tool=12345678&matt_tool_id=12345678&matt_word=seu_usuario&source=affiliate-profile&forceInApp=true
 
-# Intervalo em segundos entre as checagens (ex: 60 para 1 minuto)
+# Intervalo em segundos entre as checagens (ex: 60 segundos para 1 minuto)
 CHECK_INTERVAL_SECONDS=60
 
 # Desconto mínimo (%) para aceitar uma promoção
